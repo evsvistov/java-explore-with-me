@@ -4,45 +4,77 @@ services:
     image: stats_image
     container_name: stats_service
     depends_on:
-      - stats-db
+      stats-db:
+        condition: service_healthy
     ports:
       - "9090:9090"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/ewm-stats
+      - SPRING_DATASOURCE_USERNAME=ewm-stats
+      - SPRING_DATASOURCE_PASSWORD=ewm-stats
+    networks:
+      - ewm-network
 
   stats-db:
     image: postgres:16.1
     container_name: stats_db
     ports:
-      - "5433:5433"
+      - "5432:5432"
     environment:
-      - POSTGRES_PASSWORD=ewm-stats
-      - POSTGRES_USER=ewm-stats
       - POSTGRES_DB=ewm-stats
+      - POSTGRES_USER=ewm-stats
+      - POSTGRES_PASSWORD=ewm-stats
     healthcheck:
-      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
-      timeout: 5s
+      test: [ "CMD-SHELL", "pg_isready -U ewm-stats -d ewm-stats" ]
       interval: 5s
-      retries: 10
+      timeout: 5s
+      retries: 5
+    volumes:
+      - stats-db-data:/var/lib/postgresql/data
+    networks:
+      - ewm-network
 
   ewm-service:
     build: ./ewm-main-service
     image: service_image
     container_name: ewm-service
     depends_on:
-      - ewm-db
+      ewm-db:
+        condition: service_healthy
     ports:
       - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://ewm-db:5432/ewm-service
+      - SPRING_DATASOURCE_USERNAME=ewm-service
+      - SPRING_DATASOURCE_PASSWORD=ewm-service
+      - STATS_SERVER_URL=http://stats-server:9090
+    networks:
+      - ewm-network
 
   ewm-db:
     image: postgres:16.1
     container_name: ewm_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
-      - POSTGRES_PASSWORD=ewm-service
-      - POSTGRES_USER=ewm-service
       - POSTGRES_DB=ewm-service
+      - POSTGRES_USER=ewm-service
+      - POSTGRES_PASSWORD=ewm-service
     healthcheck:
-      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER
-      timeout: 5s
+      test: [ "CMD-SHELL", "pg_isready -U ewm-service -d ewm-service" ]
       interval: 5s
-      retries: 10
+      timeout: 5s
+      retries: 5
+
+    volumes:
+      - ewm-db-data:/var/lib/postgresql/data
+    networks:
+      - ewm-network
+
+volumes:
+  stats-db-data:
+  ewm-db-data:
+
+networks:
+  ewm-network:
+    driver: bridge
