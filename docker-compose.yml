@@ -39,6 +39,8 @@ services:
     image: service_image
     container_name: ewm-service
     depends_on:
+      stats-server:
+        condition: service_healthy
       ewm-db:
         condition: service_healthy
     ports:
