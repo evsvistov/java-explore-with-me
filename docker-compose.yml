@@ -13,11 +13,11 @@ services:
       - SPRING_DATASOURCE_USERNAME=ewm-stats
       - SPRING_DATASOURCE_PASSWORD=ewm-stats
     healthcheck:
-      test: [ "CMD", "nc", "-z", "localhost", "9090" ]
-      interval: 10s
-      timeout: 5s
+      test: [ "CMD", "curl", "-f", "http://localhost:9090/actuator/health" ]
+      interval: 30s
+      timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 40s
     networks:
       - ewm-network
 
