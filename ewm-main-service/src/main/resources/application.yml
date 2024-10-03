@@ -39,3 +39,6 @@ management:
   endpoint:
     health:
       show-details: always
+
+stats-client:
+  url: ${STATS_SERVICE_URL:http://stats-server:9090}
