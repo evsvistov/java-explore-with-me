@@ -1,5 +1,7 @@
 package ru.practicum.service;
 
+import lombok.extern.slf4j.Slf4j;
+import org.apache.coyote.BadRequestException;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,8 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
+@Slf4j
 public class StatsService {
     private final StatsRepository statsRepository;
 
@@ -23,8 +27,10 @@ public class StatsService {
         return HitMapper.toEndpointHitDto(endpointHit);
     }
 
-    @Transactional(readOnly = true)
-    public List<ViewStats> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, Boolean unique) {
+    public List<ViewStats> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, Boolean unique) throws BadRequestException {
+        if (start.isAfter(end)) {
+            throw new BadRequestException("Дата старта не может быть больше даты окнчания");
+        }
         if (uris == null || uris.isEmpty()) {
             return unique ? statsRepository.getUniqueStats(start, end) : statsRepository.getStats(start, end);
         } else {
