@@ -1,0 +1,647 @@
+{
+  "info": {
+    "_postman_id": "b4ef494e-5ee0-4259-acc6-285a21ced85e",
+    "name": "Location Testing",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "3141779"
+  },
+  "item": [
+    {
+      "name": "Add Location",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Статус код 201 (Created) или 409 (Conflict)\", function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
+              "});",
+              "",
+              "if (pm.response.code === 201) {",
+              "    pm.test(\"Response has correct structure\", function () {",
+              "        var jsonData = pm.response.json();",
+              "        pm.expect(jsonData).to.have.property('id');",
+              "        pm.expect(jsonData).to.have.property('name');",
+              "        pm.expect(jsonData).to.have.property('lat');",
+              "        pm.expect(jsonData).to.have.property('lon');",
+              "        pm.expect(jsonData).to.have.property('radius');",
+              "    });",
+              "",
+              "    pm.test(\"Location is created with correct data\", function () {",
+              "        var jsonData = pm.response.json();",
+              "        pm.expect(jsonData.name).to.eql(pm.environment.get(\"location_name\"));",
+              "        pm.expect(jsonData.lat).to.be.closeTo(parseFloat(pm.environment.get(\"location_lat\")), 0.00001);",
+              "        pm.expect(jsonData.lon).to.be.closeTo(parseFloat(pm.environment.get(\"location_lon\")), 0.00001);",
+              "        pm.expect(jsonData.radius).to.eql(0.5);",
+              "    });",
+              "",
+              "    pm.environment.set(\"location_id\", pm.response.json().id);",
+              "} else if (pm.response.code === 409) {",
+              "    pm.test(\"Conflict response received\", function () {",
+              "        var jsonData = pm.response.json();",
+              "        pm.expect(jsonData).to.have.property('message');",
+              "        console.log(\"Conflict message:\", jsonData.message);",
+              "    });",
+              "}",
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);",
+              "const locationName = \"Локация \" + uniqueId;",
+              "const lat = 58.010801 + (Math.random() - 0.5) * 0.01;",
+              "const lon = 56.232301 + (Math.random() - 0.5) * 0.01;",
+              "",
+              "pm.environment.set(\"location_name\", locationName);",
+              "pm.environment.set(\"location_lat\", lat);",
+              "pm.environment.set(\"location_lon\", lon);",
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"name\": \"{{location_name}}\",\n    \"lat\": {{location_lat}},\n    \"lon\": {{location_lon}},\n    \"radius\": 0.5\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/admin/locations",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "admin",
+            "locations"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Locations",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Get Locations with Pagination\", function () {",
+              "    pm.sendRequest({",
+              "        url: pm.variables.get('base_url') + '/admin/locations?from=0&size=5',",
+              "        method: 'GET',",
+              "        header: {",
+              "            'Content-Type': 'application/json'",
+              "        }",
+              "    }, function (err, response) {",
+              "        pm.expect(response.code).to.equal(200);",
+              "        ",
+              "        var jsonData = response.json();",
+              "        pm.expect(jsonData).to.be.an('array');",
+              "        ",
+              "        pm.expect(jsonData.length).to.be.at.most(5);",
+              "        ",
+              "        jsonData.forEach(function(location) {",
+              "            pm.expect(location).to.have.property('id');",
+              "            pm.expect(location).to.have.property('name');",
+              "            pm.expect(location).to.have.property('lat');",
+              "            pm.expect(location).to.have.property('lon');",
+              "            pm.expect(location).to.have.property('radius');",
+              "        });",
+              "        ",
+              "        if (jsonData.length > 0) {",
+              "            pm.environment.set('first_location_id', jsonData[0].id);",
+              "        }",
+              "        ",
+              "        pm.sendRequest({",
+              "            url: pm.variables.get('base_url') + '/admin/locations?from=5&size=5',",
+              "            method: 'GET',",
+              "            header: {",
+              "                'Content-Type': 'application/json'",
+              "            }",
+              "        }, function (err, nextPageResponse) {",
+              "            pm.expect(nextPageResponse.code).to.equal(200);",
+              "            var nextPageData = nextPageResponse.json();",
+              "            ",
+              "            if (nextPageData.length > 0) {",
+              "                var firstPageIds = jsonData.map(location => location.id);",
+              "                var nextPageIds = nextPageData.map(location => location.id);",
+              "                var uniqueIds = new Set([...firstPageIds, ...nextPageIds]);",
+              "                pm.expect(uniqueIds.size).to.equal(firstPageIds.length + nextPageIds.length);",
+              "            }",
+              "        });",
+              "    });",
+              "});",
+              "",
+              "pm.test(\"Get Specific Location\", function () {",
+              "    var firstLocationId = pm.environment.get('first_location_id');",
+              "    if (firstLocationId) {",
+              "        pm.sendRequest({",
+              "            url: pm.variables.get('base_url') + '/admin/locations/' + firstLocationId,",
+              "            method: 'GET',",
+              "            header: {",
+              "                'Content-Type': 'application/json'",
+              "            }",
+              "        }, function (err, response) {",
+              "            pm.expect(response.code).to.equal(200);",
+              "            var location = response.json();",
+              "            pm.expect(location.id).to.equal(firstLocationId);",
+              "            pm.expect(location).to.have.property('name');",
+              "            pm.expect(location).to.have.property('lat');",
+              "            pm.expect(location).to.have.property('lon');",
+              "            pm.expect(location).to.have.property('radius');",
+              "        });",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const locations = [",
+              "    { name: \"Локация 1\", lat: 58.0108, lon: 56.2323, radius: 1.0 },",
+              "    { name: \"Локация 2\", lat: 58.0128, lon: 56.2333, radius: 0.8 },",
+              "    { name: \"Локация 3\", lat: 58.0138, lon: 56.2343, radius: 1.2 },",
+              "    { name: \"Локация 4\", lat: 58.0148, lon: 56.2353, radius: 0.9 },",
+              "    { name: \"Локация 5\", lat: 58.0158, lon: 56.2363, radius: 1.1 },",
+              "    { name: \"Локация 6\", lat: 58.0168, lon: 56.2376, radius: 0.7 }",
+              "];",
+              "",
+              "locations.forEach(function(location) {",
+              "    pm.sendRequest({",
+              "        url: pm.variables.get('base_url') + '/admin/locations',",
+              "        method: 'POST',",
+              "        header: {",
+              "            'Content-Type': 'application/json'",
+              "        },",
+              "        body: {",
+              "            mode: 'raw',",
+              "            raw: JSON.stringify(location)",
+              "        }",
+              "    }, function (err, response) {",
+              "        console.log(\"Location added: \" + location.name);",
+              "    });",
+              "});",
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/admin/locations?from=0&size=5",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "admin",
+            "locations"
+          ],
+          "query": [
+            {
+              "key": "from",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "5"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Location by ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response has correct structure\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('id');",
+              "    pm.expect(jsonData).to.have.property('name');",
+              "    pm.expect(jsonData).to.have.property('lat');",
+              "    pm.expect(jsonData).to.have.property('lon');",
+              "    pm.expect(jsonData).to.have.property('radius');",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "packages": {},
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/admin/locations/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "admin",
+            "locations",
+            "1"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Update Location",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Location is updated with correct data\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.name).to.eql(\"Обновленная Локация 001\");",
+              "    pm.expect(jsonData.radius).to.eql(0.7);",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "packages": {},
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Обновленная Локация 001\",\n  \"radius\": 0.7\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/admin/locations/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "admin",
+            "locations",
+            "1"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Location",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 409\", function () {",
+              "    pm.response.to.have.status(409);",
+              "});",
+              "",
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/admin/locations/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "admin",
+            "locations",
+            "1"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search Events by Location",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Статус код 201 Created\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "const jsonData = pm.response.json();",
+              "const eventData = JSON.parse(pm.collectionVariables.get(\"eventData\"));",
+              "const userId = pm.collectionVariables.get(\"uid\");",
+              "const categoryId = pm.collectionVariables.get(\"categoryId\");",
+              "",
+              "pm.test(\"Ответ содержит объект события\", function () {",
+              "    pm.expect(jsonData).to.be.an('object');",
+              "});",
+              "",
+              "pm.test(\"Созданное событие присутствует в ответе\", function () {",
+              "    pm.expect(jsonData.title).to.eql(eventData.title);",
+              "    pm.expect(jsonData.annotation).to.eql(eventData.annotation);",
+              "    pm.expect(jsonData.description).to.eql(eventData.description);",
+              "    ",
+              "    const responseDate = new Date(jsonData.eventDate.replace(' ', 'T') + 'Z');",
+              "    const requestDate = new Date(eventData.eventDate.replace(' ', 'T') + 'Z');",
+              "    pm.expect(responseDate.getTime()).to.eql(requestDate.getTime());",
+              "",
+              "    pm.expect(jsonData.paid).to.eql(eventData.paid);",
+              "    pm.expect(jsonData.participantLimit).to.eql(eventData.participantLimit);",
+              "    pm.expect(jsonData.requestModeration).to.eql(eventData.requestModeration);",
+              "    ",
+              "    pm.expect(jsonData.confirmedRequests).to.eql(0);",
+              "    pm.expect(jsonData.views).to.eql(0);",
+              "    pm.expect(jsonData.state).to.eql(\"PENDING\");",
+              "});",
+              "",
+              "pm.test(\"Событие создано для правильного пользователя\", function () {",
+              "    pm.expect(jsonData.initiator).to.have.property('id');",
+              "    pm.expect(jsonData.initiator.id).to.eql(parseInt(userId));",
+              "    pm.expect(jsonData.initiator).to.have.property('name');",
+              "});",
+              "",
+              "pm.test(\"Событие создано с правильной категорией\", function () {",
+              "    pm.expect(jsonData.category).to.have.property('id');",
+              "    pm.expect(jsonData.category.id).to.eql(parseInt(categoryId));",
+              "    pm.expect(jsonData.category).to.have.property('name');",
+              "});",
+              "",
+              "pm.test(\"Локация события содержит корректные данные\", function () {",
+              "    pm.expect(jsonData.location).to.have.property('lat');",
+              "    pm.expect(jsonData.location).to.have.property('lon');",
+              "    pm.expect(jsonData.location.lat).to.be.closeTo(58.0148, 0.00001);",
+              "    pm.expect(jsonData.location.lon).to.be.closeTo(56.2353, 0.00001);",
+              "});",
+              "",
+              "pm.collectionVariables.set(\"createdEventId\", jsonData.id);",
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const RandomUtils = class {",
+              "    getUser() {",
+              "        return {",
+              "            name: \"Тестовый пользователь \" + Math.random().toString(36).substring(7),",
+              "            email: \"user\" + Math.random().toString(36).substring(7) + \"@example.com\"",
+              "        };",
+              "    }",
+              "",
+              "    getCategory() {",
+              "        return {",
+              "            name: \"Категория \" + Math.random().toString(36).substring(7)",
+              "        };",
+              "    }",
+              "",
+              "    getEvent(categoryId) {",
+              "    return {",
+              "        title: \"Событие \" + Math.random().toString(36).substring(7),",
+              "        annotation: \"Тестовое событие \" + Math.random().toString(36).substring(7),",
+              "        category: parseInt(categoryId),",
+              "        description: \"Описание тестового события \" + Math.random().toString(36).substring(7),",
+              "        eventDate: this.getRandomFutureDate(),",
+              "        location: {",
+              "            lat: 58.0148,",
+              "            lon: 56.2353 ",
+              "        },",
+              "        paid: false,",
+              "        participantLimit: 0,",
+              "        requestModeration: false",
+              "    };",
+              "}",
+              "",
+              "",
+              "    getRandomFutureDate() {",
+              "        let date = new Date();",
+              "        date.setDate(date.getDate() + Math.floor(Math.random() * 30) + 2);",
+              "        return date.toISOString().slice(0, 19).replace('T', ' '); ",
+              "    }",
+              "};",
+              "",
+              "const rnd = new RandomUtils();",
+              "",
+              "const createUser = () => {",
+              "    return new Promise((resolve, reject) => {",
+              "        pm.sendRequest({",
+              "            url: pm.variables.get('base_url') + '/admin/users',",
+              "            method: 'POST',",
+              "            header: {'Content-Type': 'application/json'},",
+              "            body: {",
+              "                mode: 'raw',",
+              "                raw: JSON.stringify(rnd.getUser())",
+              "            }",
+              "        }, (err, res) => {",
+              "            if (err) {",
+              "                reject(err);",
+              "            } else {",
+              "                resolve(res.json());",
+              "            }",
+              "        });",
+              "    });",
+              "};",
+              "",
+              "const createCategory = () => {",
+              "    return new Promise((resolve, reject) => {",
+              "        pm.sendRequest({",
+              "            url: pm.variables.get('base_url') + '/admin/categories',",
+              "            method: 'POST',",
+              "            header: {'Content-Type': 'application/json'},",
+              "            body: {",
+              "                mode: 'raw',",
+              "                raw: JSON.stringify(rnd.getCategory())",
+              "            }",
+              "        }, (err, res) => {",
+              "            if (err) {",
+              "                reject(err);",
+              "            } else {",
+              "                resolve(res.json());",
+              "            }",
+              "        });",
+              "    });",
+              "};",
+              "",
+              "const main = async () => {",
+              "    try {",
+              "        const user = await createUser();",
+              "        console.log(\"Created user:\", user);",
+              "        pm.collectionVariables.set(\"uid\", user.id);",
+              "",
+              "        const category = await createCategory();",
+              "        console.log(\"Created category:\", category);",
+              "        pm.collectionVariables.set(\"categoryId\", category.id);",
+              "",
+              "        const event = rnd.getEvent(category.id);",
+              "        console.log(\"Generated event:\", JSON.stringify(event, null, 2));",
+              "        pm.collectionVariables.set(\"eventData\", JSON.stringify(event));",
+              "",
+              "        // Обновляем текущий запрос",
+              "        pm.request.url.update(pm.variables.get('base_url') + '/users/' + user.id + '/events');",
+              "        pm.request.method = 'POST';",
+              "        pm.request.headers.upsert({key: 'Content-Type', value: 'application/json'});",
+              "        pm.request.body.update({",
+              "            mode: 'raw',",
+              "            raw: JSON.stringify(event)",
+              "        });",
+              "",
+              "        console.log(\"Final request URL:\", pm.request.url.toString());",
+              "        console.log(\"Final request body:\", pm.request.body.raw);",
+              "    } catch(err) {",
+              "        console.error(\"Ошибка при подготовке тестовых данных:\", err);",
+              "    }",
+              "};",
+              "",
+              "main();",
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/events/location?lat=58.0148&lon=56.2353&radius=0.4",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "events",
+            "location"
+          ],
+          "query": [
+            {
+              "key": "lat",
+              "value": "58.0148"
+            },
+            {
+              "key": "lon",
+              "value": "56.2353"
+            },
+            {
+              "key": "radius",
+              "value": "0.4"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "uid",
+      "value": ""
+    },
+    {
+      "key": "categoryId",
+      "value": ""
+    },
+    {
+      "key": "eventData",
+      "value": ""
+    },
+    {
+      "key": "createdEventId",
+      "value": ""
+    }
+  ]
+}

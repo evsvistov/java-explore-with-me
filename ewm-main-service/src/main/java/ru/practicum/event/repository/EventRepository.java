@@ -35,4 +35,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     @Query("SELECT COUNT(e) > 0 FROM Event e WHERE e.category.id = :categoryId")
     boolean existsByCategoryId(Long categoryId);
+
+    @Query("SELECT COUNT(e) > 0 FROM Event e WHERE e.location.id = :locationId")
+    boolean existsByLocationId(Long locationId);
 }
