@@ -309,12 +309,12 @@ public class EventService {
         }
     }
 
-    public List<EventShortDto> findEventsInLocation(Double lat, Double lon, Double radius) {
+    public List<EventFullDto> findEventsInLocation(Double lat, Double lon, Double radius) {
         log.info("Поиск событий в локации с координатами: ({}, {}) и радиусом: {}", lat, lon, radius);
         List<Event> events = locationRepository.findEventsInLocation(lat, lon, radius);
         log.info("Найдено {} событий в заданной локации", events.size());
         return events.stream()
-                .map(eventMapper::toShortDto)
+                .map(eventMapper::toFullDto)
                 .collect(Collectors.toList());
     }
 }

@@ -37,7 +37,7 @@ public class EventPublicController {
     }
 
     @GetMapping("/location")
-    public List<EventShortDto> getEventsPublicByLocation(@RequestParam Double lat,
+    public List<EventFullDto> getEventsPublicByLocation(@RequestParam Double lat,
                                                          @RequestParam Double lon,
                                                          @RequestParam Double radius) {
         return eventService.findEventsInLocation(lat, lon, radius);
