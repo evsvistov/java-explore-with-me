@@ -308,4 +308,13 @@ public class EventService {
             throw new BadRequestException("Параметр 'size' должен быть положительным");
         }
     }
+
+    public List<EventFullDto> findEventsInLocation(Double lat, Double lon, Double radius) {
+        log.info("Поиск событий в локации с координатами: ({}, {}) и радиусом: {}", lat, lon, radius);
+        List<Event> events = locationRepository.findEventsInLocation(lat, lon, radius);
+        log.info("Найдено {} событий в заданной локации", events.size());
+        return events.stream()
+                .map(eventMapper::toFullDto)
+                .collect(Collectors.toList());
+    }
 }
